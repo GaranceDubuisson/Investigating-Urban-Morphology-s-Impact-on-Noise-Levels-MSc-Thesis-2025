@@ -1,0 +1,6 @@
+def count_streets_per_node_manual(G):
+    streets_per_node = {}
+    for node, data in G.nodes(data=True):
+        num_streets = len(list(G.edges(node)))
+        streets_per_node[node] = num_streets
+    return streets_per_node
