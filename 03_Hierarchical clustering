@@ -1,0 +1,32 @@
+def hierarchical_clustering(data_points, varying_variables, num_clusters=3, linkage_method='ward'):
+    district_names = data_points.iloc[:, 0].values
+    data = data_points[varying_variables].values
+    clustering_model = AgglomerativeClustering(n_clusters=num_clusters, linkage=linkage_method)
+    cluster_labels = clustering_model.fit_predict(data)
+    data_points['Cluster Labels'] = cluster_labels
+
+    plt.figure(figsize=(12, 8))
+    plt.title('Dendrogram of Districts Clustering')
+    unique_labels = sorted(set(cluster_labels))
+    colors = sns.color_palette("Set1", len(unique_labels))
+    color_dict = {label: color for label, color in zip(unique_labels, colors)}
+    linkage_matrix = sch.linkage(data, method=linkage_method)
+    dendrogram = sch.dendrogram(
+        linkage_matrix,
+        labels=district_names,
+        leaf_rotation=90,
+        leaf_font_size=12,
+        color_threshold=0,
+        above_threshold_color='grey',
+    )
+    ax = plt.gca()
+    for i, label in enumerate(dendrogram['ivl']):
+        cluster_label = cluster_labels[district_names.tolist().index(label)]
+        ax.get_xticklabels()[i].set_color(color_dict[cluster_label])
+    legend_handles = [plt.Line2D([0], [0], marker='o', color='w', label=f'Cluster {label}',
+                                 markerfacecolor=color, markersize=8)
+                      for label, color in color_dict.items()]
+    plt.legend(handles=legend_handles, title="Clusters")
+    plt.show()
+
+    return cluster_labels
