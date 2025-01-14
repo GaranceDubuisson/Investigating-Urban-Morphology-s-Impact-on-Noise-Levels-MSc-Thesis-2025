@@ -1,0 +1,96 @@
+def calculate_urban_parameters_from_shapefile(shapefile_path = CPH_path):
+    polygons = gpd.read_file(shapefile_path).to_crs(epsg=3857)
+    polygons["tot_area"] = polygons.geometry.area
+    polygons = polygons.to_crs(epsg=4326)
+    results = []
+    for idx, poly in polygons.iterrows(): 
+        polygon = poly.geometry         
+        gmc = poly.get('GMC', None)
+        buildings = get_features_with_exception_from_polygon(polygon, tags_buildings)
+        water = get_features_with_exception_from_polygon(polygon, tags_water)
+        green = get_features_with_exception_from_polygon(polygon, tags_green)
+        public = get_features_with_exception_from_polygon(polygon, tags_public)
+        office = get_features_with_exception_from_polygon(polygon, tags_office)
+        commercial = get_features_with_exception_from_polygon(polygon, tags_commercial)
+
+        # Densities
+        total_area = poly.get('tot_area')
+        pop_dens = poly.get('Pop_dens')
+        building_area = buildings.geometry.area.sum()
+        GSI = building_area / total_area
+        buildings['building_area'] = buildings.geometry.area
+        if 'building:levels' in buildings.columns:
+            buildings['building:levels'] = pd.to_numeric(buildings['building:levels'], errors='coerce')
+            av_levels = buildings['building:levels'].mean()
+            #print('av levels:', av_levels)
+            buildings['levels'] = buildings['building:levels'].fillna(av_levels).astype(float)
+        else:
+            buildings['levels'] = 1.0
+        buildings['floor_area'] = buildings['building_area'] * buildings['levels']
+        floor_area = buildings['floor_area'].sum()
+        FSI = floor_area / total_area
+        porosity = 1 - GSI
+        commercial_area = commercial.geometry.area.sum() if (not commercial is None) else 0
+        Com_ratio = commercial_area / building_area if building_area > 0 else 0
+        public_area = public.geometry.area.sum() if (not public is None) else 0
+        Pub_ratio = public_area / building_area if building_area > 0 else 0
+        office_area = office.geometry.area.sum() if (not office is None) else 0
+        Off_ratio = office_area / building_area if building_area > 0 else 0
+        green_area = green.geometry.area.sum() if (not green is None) else 0
+        green_ratio = green_area / total_area
+        water_area = water.geometry.area.sum() if (not water is None) else 0
+        water_ratio = water_area / total_area
+
+        # Built environment
+        buildings['height'] = buildings['levels'] * 3.2
+        mean_height = np.average(buildings['height'], weights=buildings['building_area'])
+        mean_compactness = calculate_mean_compactness(buildings)
+        num_buildings = len(buildings)
+
+        # Street network
+        streets = ox.graph_from_polygon(polygon, network_type='drive')
+        intersections = count_streets_per_node_manual(streets)
+        num_intersections = len([node for node, count in intersections.items() if count > 1])
+        streets = ox.graph_to_gdfs(streets, nodes=False, edges=True).to_crs(epsg=3857)
+        buffer = 20
+        SWH = calculate_sw_h(buildings, streets, buffer, mean_height)
+        road_length = streets.geometry.length.sum()
+        road_coverage = road_length / total_area
+        streets['road_area'] = streets['street_width'] * streets['length']
+        road_coverage_best = streets['road_area'].sum() / total_area
+
+        # Add QGIS results
+        L_den = poly.get('L_den')
+        L_night = poly.get('L_night')
+        AADT = poly.get('AADT')
+        if AADT is not None:
+            AADT=AADT/total_area # veh/day/m²          
+        Total_AADT = poly.get('Total_AADT')
+        
+        results.append({
+            'District id': gmc,
+            'Total area [km2]': total_area/1000000,
+            'Population density [p/km2]': pop_dens,
+            'GSI (Coverage)': GSI,
+            'FSI (Intensity)': FSI,
+            'Porosity': porosity,
+            'Road Coverage [m/m2]': road_coverage,
+            'Road Coverage [n.u.]': road_coverage_best,
+            'Green Space Ratio': green_ratio,
+            'Water Surface Ratio': water_ratio,
+            'Commercial Use Ratio': Com_ratio,
+            'Public Use Ratio': Pub_ratio,
+            'Office Use Ratio': Off_ratio,
+            'Mean compactness': mean_compactness,
+            'Mean Height [m]': mean_height,
+            'Sky View Factor SW/H': SWH,
+            'Number of Buildings': num_buildings,
+            'Road Length [m]': road_length,
+            'Number of Intersections': num_intersections,
+            'AADT [veh/day/m2]': AADT,
+            'Total AADT [veh/day]': Total_AADT,
+            'L_den [dB]': L_den,
+            'L_night [dB]': L_night
+        })
+    
+    return results
