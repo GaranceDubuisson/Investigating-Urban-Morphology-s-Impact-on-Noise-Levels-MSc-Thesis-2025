@@ -1,0 +1,18 @@
+def load_data_from_excel(file_path, sheet_name, num_dis=8, num_var=18, num_obs=2):
+    df = pd.read_excel(file_path, sheet_name=sheet_name, header=0, nrows=num_dis+num_obs)
+    n = len(df.columns)
+    varying_variables = df.columns[1:n-num_obs-1]
+    observation_variables = df.columns[-num_obs-1:-1]
+    
+    labels = df.iloc[0:num_dis, 0]
+    clusters = df.iloc[0:num_dis, -1]
+    data_points = df[0:num_dis]
+    
+    imputer = SimpleImputer(strategy='mean')
+    data_points = pd.DataFrame(imputer.fit_transform(data_points), index=data_points.index, columns=data_points.columns)
+    
+    pearson_coef = {}
+    for i in range(num_obs):
+        pearson_coef[f'pearson_var_{i+1}'] = df.iloc[num_dis + i, 1:n-num_obs].values
+          
+    return pearson_coef, data_points, varying_variables, observation_variables, labels, clusters
