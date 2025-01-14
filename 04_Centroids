@@ -1,0 +1,17 @@
+def centroids(districts, num_dis, num_obs, num_var, labels, sub=False, main_labels=main_labels):
+    index_labels = list(districts.columns[1:num_obs + num_var+2])
+    index_labels = [label for label in index_labels if label is not None]
+    centroids = pd.DataFrame(index=index_labels)  
+    for c in labels:
+        cluster_data = districts[0:num_dis].loc[districts['cluster'] == c, index_labels]
+        archetype = cluster_data.mean(axis=0)
+        archetype = pd.concat([pd.Series([c], index=["Centroid"]), archetype])
+        centroids[c] = archetype  
+    if sub:
+        for c in main_labels:
+            cluster_data = districts[0:num_dis].loc[districts['main cluster'] == c, index_labels]
+            archetype = cluster_data.mean(axis=0)
+            archetype = pd.concat([pd.Series([c], index=["Centroid"]), archetype])
+            centroids[c] = archetype
+    centroids_transposed = centroids.T 
+    return centroids_transposed
