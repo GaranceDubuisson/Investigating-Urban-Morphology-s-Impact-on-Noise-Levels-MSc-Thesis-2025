@@ -1,0 +1,98 @@
+coord_CPH = (55.6761, 12.5683)
+CPH_path = r"C:\Users\PC\OneDrive - Danmarks Tekniske Universitet\Thesis\QGIS\v4\CPH_districts2.shp"
+excel_path = r"C:\Users\PC\OneDrive - Danmarks Tekniske Universitet\Thesis\CPH urban stat.xlsx"
+streets_CPH = r"C:\Users\PC\OneDrive - Danmarks Tekniske Universitet\Thesis\QGIS\From Python\CPH"
+num_dis = 61
+num_obs = 2
+num_var = 15
+
+# Street-based Local Areas
+com_CPH=streets_community(coord=coord_CPH, dist=5000)
+ox.io.save_graph_shapefile(com_CPH, com_path, encoding='utf-8', directed=True)
+
+# Urban statistics
+stats_CPH = calculate_urban_parameters_from_shapefile(CPH_path)
+stats_df = pd.DataFrame(stats_CPH) 
+with pd.ExcelWriter(excel_path, engine='openpyxl', mode='a') as writer:
+    workbook = writer.book
+    if 'v4' in workbook.sheetnames:
+        del workbook['v4']
+    stats_df.to_excel(writer, sheet_name='v4', index=False)
+
+# Clustering
+CPH = pd.read_excel(excel_path, sheet_name=sheet_name, header=0, nrows=num_dis+num_obs)
+pearson_coef, data_points, varying_variables, observation_variables, labels = load_data_from_excel(excel_path, sheet_name, num_dis, num_var, num_obs)
+imputer = SimpleImputer(strategy='mean')
+data_points = pd.DataFrame(imputer.fit_transform(data_points), index=data_points.index, columns=data_points.columns)
+
+sse_values = optimal_clusters_sse(data_points[varying_variables], max_clusters=15)
+silhouette_scores = optimal_clusters_silhouette(data_points[varying_variables], max_clusters=15)
+num_clusters=7
+cluster_labels_kmeans = kmeans_clustering(data_points, varying_variables, num_clusters)
+cluster_labels_hier = hierarchical_clustering(data_points, varying_variables, num_clusters)
+cluster_labels = np.append(cluster_labels_hier, [None, None])
+new_sheet = 'Clusters v5'
+CPH['cluster'] = cluster_labels
+with pd.ExcelWriter(excel_path, engine='openpyxl', mode='a') as writer:
+    workbook = writer.book
+    if new_sheet in workbook.sheetnames:
+        del workbook[new_sheet]
+    CPH.to_excel(writer, sheet_name=new_sheet, index=False)
+    CPH['cluster'] = cluster_labels
+CPH_centroids = centroids(CPH, num_dis, num_obs, num_var, cluster_labels_hier)
+centroids_sheet = 'Centroids v5'
+with pd.ExcelWriter(excel_path, engine='openpyxl', mode='a') as writer:
+    workbook = writer.book
+    if centroids_sheet in workbook.sheetnames:
+        del workbook[centroids_sheet]
+    CPH_centroids.to_excel(writer, sheet_name=centroids_sheet, index=True)
+
+sse_values = optimal_clusters_sse(data_points[varying_variables], max_clusters=15)
+silhouette_scores = optimal_clusters_silhouette(data_points[varying_variables], max_clusters=15)
+num_main_clusters, num_sub_clusters=4, 14
+combined_labels, main_labels, sub_labels = hierarchical_clustering_with_subclusters(data_points, varying_variables, num_main_clusters, num_sub_clusters)
+combined_labels = np.append(combined_labels, [None, None])
+main_labels = np.append(main_labels, [None, None])
+sub_labels = np.append(sub_labels, [None, None])
+CPHsub=CPH
+new_sheet = 'Sub clusters v5'
+CPHsub['cluster'], CPHsub['main cluster'], CPHsub['comb cluster'] = sub_labels, main_labels, combined_labels
+with pd.ExcelWriter(excel_path, engine='openpyxl', mode='a') as writer:
+    workbook = writer.book
+    if new_sheet in workbook.sheetnames:
+        del workbook[new_sheet]
+    CPH.to_excel(writer, sheet_name=new_sheet, index=False)
+CPH_centroids_sub = centroids(CPHsub, num_dis, num_obs, num_var, sub_labels, True)
+centroids_sub_sheet = 'Centroids sub v5'
+with pd.ExcelWriter(excel_path, engine='openpyxl', mode='a') as writer:
+    workbook = writer.book
+    if centroids_sub_sheet in workbook.sheetnames:
+        del workbook[centroids_sub_sheet]
+    CPH_centroids_sub.to_excel(writer, sheet_name=centroids_sub_sheet, index=True)
+
+
+best_10 = top_pearson(pearson_coef, 10)
+sse_values = optimal_clusters_sse(data_points.iloc[:, best_10], max_clusters=10)
+silhouette_scores = optimal_clusters_silhouette(data_points.iloc[:, best_10], max_clusters=10)
+num_clusters=4
+data_points10=data_points.iloc[:, best_10]
+data_points10 = pd.concat([data_points.iloc[:,0],data_points.iloc[:, best_10], data_points[observation_variables]], axis=1)
+varying_variables10 = pd.Index(data_points10.columns.tolist()[:10])
+cluster_labels_hier10 = hierarchical_clustering(data_points10, varying_variables10, num_clusters)
+cluster_labels10 = np.append(cluster_labels_hier10, [None, None])
+CPH10 = CPH
+new_sheet10 = 'Clusters v5 best 10'
+CPH10['cluster'] = cluster_labels10
+with pd.ExcelWriter(excel_path, engine='openpyxl', mode='a') as writer:
+    workbook = writer.book
+    if new_sheet10 in workbook.sheetnames:
+        del workbook[new_sheet10]
+    CPH10.to_excel(writer, sheet_name=new_sheet10, index=False)
+CPH10['cluster'] = cluster_labels10
+CPH10_centroids = centroids(CPH10, num_dis, num_obs, num_var, labels=cluster_labels_hier10)
+centroids_sheet10 = 'Centroids v5 best10'
+with pd.ExcelWriter(excel_path, engine='openpyxl', mode='a') as writer:
+    workbook = writer.book
+    if centroids_sheet10 in workbook.sheetnames:
+        del workbook[centroids_sheet10]
+    CPH10_centroids.to_excel(writer, sheet_name=centroids_sheet10, index=True)
