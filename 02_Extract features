@@ -1,0 +1,8 @@
+def get_features_with_exception_from_polygon(polygon, tags):
+    try:
+        features = ox.features_from_polygon(polygon, tags)
+        gdf = gpd.GeoDataFrame(features, crs='EPSG:4326').to_crs(epsg=3857)
+        if gdf.empty:
+            print(f"No features found with {tags}")
+            return None
+        return gdf
