@@ -1,0 +1,11 @@
+def streets_community(coord=coord_CPH, dist=5000):
+    G = ox.graph_from_point(coord, dist, dist_type='bbox', network_type='drive', simplify=True)
+    L = nx.line_graph(G)
+    c = list(greedy_modularity_communities(L))
+    a = 1
+    for i in c:
+        i = list(i)
+        for x in i:
+            G[x[0]][x[1]][0]['GMC'] = a
+        a = a + 1
+    return G
