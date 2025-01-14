@@ -1,0 +1,8 @@
+def top_pearson(pearson_coef, num_top=10):
+    pearson_df = pd.DataFrame(pearson_coef, columns=['pearson_var_1', 'pearson_var_2'])
+    pearson_mean = pearson_df.abs().mean(axis=1) 
+    best_variables = pearson_mean.nlargest(num_top).index
+    best_variables = best_variables+[1]*num_top
+    best_variables = sorted(best_variables)
+    print('Most correlated variables:', best_variables)
+    return best_variables
