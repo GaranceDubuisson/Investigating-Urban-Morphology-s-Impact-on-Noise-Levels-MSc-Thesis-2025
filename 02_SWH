@@ -1,0 +1,21 @@
+def calculate_sw_h(buildings, streets, buffer_distance, mean_height) :
+    streets['buffer'] = streets.geometry.buffer(buffer_distance)
+    streets['left_building_distance'] = streets['buffer'].apply(
+        lambda buffer: buildings[buildings.geometry.intersects(buffer)].distance(buffer).min()
+        if not buildings[buildings.geometry.intersects(buffer)].empty else np.nan)
+    streets['street_width'] = 2 * streets['left_building_distance']
+    streets['street_width'] = streets['street_width'].fillna(10)
+    streets['street_width'] = streets['street_width'].replace(0, 10)
+    streets['mean_building_height'] = streets['buffer'].apply(
+        lambda buffer: buildings[buildings.geometry.intersects(buffer)]['height'].mean()
+        if not buildings[buildings.geometry.intersects(buffer)].empty else np.nan)
+    streets['mean_building_height'].fillna(mean_height, inplace=True)
+    streets['SW_H'] = np.where(
+        (streets['mean_building_height'] > 0) & (streets['street_width'] > 0),
+        streets['street_width'] / streets['mean_building_height'],
+        np.nan)
+    if streets['SW_H'].notna().any():
+        global_sw_h = np.average(streets['SW_H'].dropna(), weights=streets.loc[streets['SW_H'].notna(), 'geometry'].length)
+        return global_sw_h
+    else:
+        return np.nan
