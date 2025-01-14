@@ -1,0 +1,11 @@
+def calculate_mean_compactness(buildings):
+    buildings = buildings[buildings.is_valid]
+    buildings['area'] = buildings.geometry.area
+    buildings['perimeter'] = buildings.geometry.length
+    buildings = buildings[(buildings['area'] > 0) & (buildings['perimeter'] > 0)]
+    buildings['compactness'] = (4 * np.pi * buildings['area']) / (buildings['perimeter'] ** 2)  
+    valid_buildings = buildings[buildings['perimeter'] > 0]
+    if valid_buildings.empty:
+        return np.nan
+    mean_compactness = (valid_buildings['compactness'] * valid_buildings['area']).sum() / valid_buildings['area'].sum()
+    return mean_compactness
