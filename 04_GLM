@@ -1,0 +1,30 @@
+data = pd.read_excel(r"C:\Users\PC\OneDrive - Danmarks Tekniske Universitet\Thesis\Analyses.xlsx", sheet_name='CPH main', nrows=61)
+imputer = SimpleImputer(strategy='mean')
+data = pd.DataFrame(imputer.fit_transform(data), index=data.index, columns=data.columns)
+
+X = data.iloc[:, 2:-3]
+y = data["L_den [dB]"]
+X = sm.add_constant(X)
+X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, random_state=42)
+glm_model_CPH = sm.GLM(y_train, X_train, family=sm.families.Gaussian()).fit()
+print(glm_model_CPH.summary())
+
+y_pred = glm_model_CPH.predict(X_test)
+residuals = y_test - y_pred
+plt.figure(figsize=(10, 6))
+sns.residplot(x=y_pred, y=residuals, lowess=True, line_kws={'color': 'red', 'lw': 2}, scatter_kws={'alpha': 0.6})
+plt.axhline(0, color='black', linestyle='--', linewidth=1)  # Horizontal line at 0 for reference
+plt.xlabel("Predicted L_den [dB]", fontsize=12)
+plt.ylabel("Residuals (Observed - Predicted)", fontsize=12)
+plt.title("Residual Plot: Assessing Model Fit", fontsize=14, fontweight='bold')
+plt.grid(visible=True, which='both', linestyle='--', linewidth=0.5, alpha=0.7)
+plt.tight_layout()
+plt.show()
+
+glm_results_df = pd.DataFrame({
+    "Variable": glm_model_CPH.params.index,
+    "Coefficient": glm_model_CPH.params.values,
+    "Standard Error": glm_model_CPH.bse.values,
+    "z-value": glm_model_CPH.tvalues.values,
+    "p-value": glm_model_CPH.pvalues.values
+})
